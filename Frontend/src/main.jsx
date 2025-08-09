@@ -14,7 +14,7 @@ import QuizAttempt from './pages/QuizAttempts.jsx'
 import CPUScheduling from "./simulation/CPUSchedulingSimulator.jsx"
 import MemorySimulation from './simulation/MemorySimulation.jsx'
 import VirtualMemory from './simulation/VirtualMemory.jsx'
-import Os_process_Deadlock from './simulation/OS_Process_Deadlock.jsx'
+import OSSimulation from './simulation/OS_Process_Deadlock.jsx'
 import LearningDashboard from './pages/LearningDashboard.jsx'
 const route = createBrowserRouter([
   {
@@ -61,7 +61,7 @@ const route = createBrowserRouter([
           },
           {
             path: "more-topic",
-            element: <Os_process_Deadlock />
+            element: <OSSimulation />
           }
         ]
       },
