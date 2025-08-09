@@ -14,7 +14,7 @@ import QuizAttempt from './pages/QuizAttempts.jsx'
 import CPUScheduling from "./simulation/CPUSchedulingSimulator.jsx"
 import MemorySimulation from './simulation/MemorySimulation.jsx'
 import VirtualMemory from './simulation/VirtualMemory.jsx'
-import OSSimulation from './simulation/OS_Process_Deadlock.jsx'
+import OSSimulation from './simulation/OSSimulation.jsx'
 import LearningDashboard from './pages/LearningDashboard.jsx'
 const route = createBrowserRouter([
   {
