@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import apiService from "../Api/api.js";
 import { useNavigate, Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { Button, Input, Logo } from "./index.js";
+import { Button, Input, } from "./index.js";
 import { useForm } from "react-hook-form";
 import { loginSuccess as authLogin } from "../store/authSlice.js";
 
@@ -34,7 +34,7 @@ const Signup = () => {
       <div className="mx-auto w-full max-w-lg bg-gray-100 rounded-xl p-10 border border-black/10">
         <div className="mb-2 flex justify-center">
           <span className="inline-block w-full max-w-[100px]">
-            <Logo width="100%" />
+            Logo
           </span>
         </div>
         <h2 className="text-center text-2xl font-bold leading-tight">

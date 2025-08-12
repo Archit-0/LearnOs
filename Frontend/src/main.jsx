@@ -22,16 +22,16 @@ const route = createBrowserRouter([
     element: <App />,
     children: [
       {
+        index: true,
+        element: <Dashboard />,
+      },
+      {
         path: "/login",
         element: <Login />,
       },
       {
         path: "/register",
         element: <Register />,
-      },
-      {
-        path: '/Dashboard',
-        element: <Dashboard />
       },
       {
         path: "/quizzes",

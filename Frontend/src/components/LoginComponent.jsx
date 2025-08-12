@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginSuccess as authLogin } from "../store/authSlice";
-import { Button, Input, Logo } from "./index";
+import { Button, Input } from "./index";
 import { useDispatch } from "react-redux";
 import apiService from "../Api/api";
 import { useForm } from "react-hook-form";
@@ -10,7 +10,7 @@ function LoginComponent() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { register, handleSubmit } = useForm({
-     defaultValues: {
+    defaultValues: {
       email: "banana@gmail.com",
       password: "12345678",
     },
@@ -39,7 +39,7 @@ function LoginComponent() {
       >
         <div className="mb-2 flex justify-center">
           <span className="inline-block w-full max-w-[100px]">
-            <Logo width="100%" />
+            <h1>logo</h1>
           </span>
         </div>
         <h2 className="text-center text-2xl font-bold leading-tight">
