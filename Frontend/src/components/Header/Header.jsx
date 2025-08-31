@@ -17,7 +17,6 @@ const Logo = () => (
     </span>
   </div>
 );
-
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,11 +26,27 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [scrolled, setScrolled] = useState(false);
+  const [showHeader, setShowHeader] = useState(true);
 
+  // Track scroll position
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    let lastScrollY = window.scrollY;
+
+    const updateScroll = () => {
+      setScrolled(window.scrollY > 20);
+
+      if (window.scrollY > lastScrollY) {
+        // scrolling down -> hide header
+        setShowHeader(false);
+      } else {
+        // scrolling up -> show header
+        setShowHeader(true);
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener("scroll", updateScroll);
+    return () => window.removeEventListener("scroll", updateScroll);
   }, []);
 
   const navItems = [
@@ -67,11 +82,13 @@ const Header = () => {
     setActiveDropdown(null);
   };
 
+
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-gray-900/95 backdrop-blur-lg shadow-lg border-b border-gray-800/50' : 'bg-gray-900/80 backdrop-blur-sm'
-          }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 transform 
+          ${scrolled ? 'bg-gray-900/95 backdrop-blur-lg shadow-lg border-b border-gray-800/50' : 'bg-gray-900/80 backdrop-blur-sm'}
+          ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}
       >
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div onClick={() => navigateTo('/')}><Logo /></div>

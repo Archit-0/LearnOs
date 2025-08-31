@@ -33,7 +33,7 @@ function LoginComponent() {
   };
 
   return (
-    <div className="flex items-center justify-center w-full">
+    <div className="flex items-center justify-center w-full min-h-screen bg-gray-200">
       <div
         className={`mx-auto w-full max-w-lg bg-gray-100 rounded-xl p-10 border border-black/10`}
       >
@@ -48,7 +48,7 @@ function LoginComponent() {
         <p className="mt-2 text-center text-base text-black/60">
           Don&apos;t have any account?&nbsp;
           <Link
-            to="/signup"
+            to="/register"
             className="font-medium text-primary transition-all duration-200 hover:underline"
           >
             Sign Up
