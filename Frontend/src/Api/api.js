@@ -1,9 +1,9 @@
 // api.js - Frontend API Service Client using Axios
 import axios from 'axios';
 
-const API_BASE_URL = 'https://learnos-olvx.onrender.com/api';
-// const API_BASE_URL = 'http://localhost:5000/api'; 
-
+// const API_BASE_URL = 'https://learnos-olvx.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api'; 
+// const API_BASE_URL = "mongodb+srv://baniya8368:baniya0422@cluster0.ahafqbb.mongodb.net/osLearningPlatform?appName=Cluster0"
 class ApiService {
   constructor() {
     // Create axios instance
