@@ -1,29 +1,31 @@
-const express = require('express');
-const Module = require('../models/Module');
-const Progress = require('../models/Progress');
-const QuizAttempt = require('../models/QuizAttempt');
-const auth = require('../middleware/auth');
+const express = require("express");
+const Module = require("../models/Module");
+const Progress = require("../models/Progress");
+const QuizAttempt = require("../models/QuizAttempt");
+const auth = require("../middleware/auth");
 
 const router = express.Router();
 
 // Get personalized learning path
-router.get('/recommend', auth, async (req, res) => {
+router.get("/recommend", auth, async (req, res) => {
   try {
     const userId = req.user._id;
-    const userLevel = req.user.preferences.difficulty;
+    const userLevel = req.user?.preferences?.difficulty || "beginner";
 
     // Get user's progress
-    const userProgress = await Progress.find({ user: userId })
-      .populate('module', 'title slug category difficulty prerequisites');
+    const userProgress = await Progress.find({ user: userId }).populate(
+      "module",
+      "title slug category difficulty prerequisites order"
+    );
 
     // Get all modules
     const allModules = await Module.find({ isPublished: true })
-      .populate('prerequisites', 'title slug')
+      .populate("prerequisites", "title slug")
       .sort({ order: 1 });
 
     // Create progress map
     const progressMap = {};
-    userProgress.forEach(p => {
+    userProgress.forEach((p) => {
       if (p.module) {
         progressMap[p.module._id.toString()] = p;
       }
@@ -32,15 +34,14 @@ router.get('/recommend', auth, async (req, res) => {
     // Analyze user performance
     const recentQuizzes = await QuizAttempt.find({ user: userId })
       .populate({
-        path: 'quiz',
-        populate: { path: 'module', select: 'category' }
+        path: "quiz",
+        populate: { path: "module", select: "category" },
       })
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Calculate performance by category
     const categoryPerformance = {};
-    recentQuizzes.forEach(attempt => {
+    recentQuizzes.forEach((attempt) => {
       if (attempt.quiz && attempt.quiz.module) {
         const category = attempt.quiz.module.category;
         if (!categoryPerformance[category]) {
@@ -51,104 +52,116 @@ router.get('/recommend', auth, async (req, res) => {
       }
     });
 
-    // Calculate average scores per category
-    Object.keys(categoryPerformance).forEach(category => {
+    Object.keys(categoryPerformance).forEach((category) => {
       const scores = categoryPerformance[category].scores;
-      categoryPerformance[category].average = scores.reduce((a, b) => a + b, 0) / scores.length;
+      categoryPerformance[category].average =
+        scores.reduce((a, b) => a + b, 0) / scores.length;
     });
 
-    // Generate recommendations
     const recommendations = [];
 
-    // 1. Next logical modules (based on prerequisites and completion)
     const completedModules = userProgress
-      .filter(p => p.status === 'completed')
-      .map(p => p.module._id.toString());
+      .filter((p) => p.status === "completed" && p.module)
+      .map((p) => p.module._id.toString());
 
     const inProgressModules = userProgress
-      .filter(p => p.status === 'in-progress')
-      .map(p => p.module._id.toString());
+      .filter((p) => p.status === "in-progress" && p.module)
+      .map((p) => p.module._id.toString());
 
-    allModules.forEach(module => {
+    const allWeakAreas = userProgress.reduce(
+      (areas, p) => [...areas, ...(p.weakAreas || [])],
+      []
+    );
+
+    allModules.forEach((module) => {
       const moduleId = module._id.toString();
       const progress = progressMap[moduleId];
-      
-      // Skip if already completed
+
       if (completedModules.includes(moduleId)) return;
 
       let score = 0;
-      let reason = [];
+      const reason = [];
 
-      // Check prerequisites
-      const prerequisitesMet = module.prerequisites.every(prereq => 
+      const prerequisitesMet = module.prerequisites.every((prereq) =>
         completedModules.includes(prereq._id.toString())
       );
+      if (!prerequisitesMet) return;
 
-      if (!prerequisitesMet) return; // Skip if prerequisites not met
-
-      // Scoring logic
-      
-      // 1. Continue in-progress modules (high priority)
+      // 1. Continue in-progress modules
       if (inProgressModules.includes(moduleId)) {
         score += 50;
-        reason.push('Continue your current progress');
+        reason.push("Continue your current progress");
       }
 
       // 2. Match user's difficulty preference
       if (module.difficulty === userLevel) {
         score += 20;
         reason.push(`Matches your ${userLevel} level`);
-      } else if (userLevel === 'beginner' && module.difficulty === 'intermediate') {
+      } else if (
+        (userLevel === "beginner" && module.difficulty === "intermediate") ||
+        (userLevel === "intermediate" && module.difficulty === "advanced")
+      ) {
         score += 10;
-        reason.push('Next step in difficulty');
-      } else if (userLevel === 'intermediate' && module.difficulty === 'advanced') {
-        score += 10;
-        reason.push('Next step in difficulty');
+        reason.push("Next step in difficulty");
       }
 
-      // 3. Weak areas (high priority)
-      const allWeakAreas = userProgress.reduce((areas, p) => [...areas, ...p.weakAreas], []);
+      // 3. Weak areas
       const moduleCategory = module.category;
-      
-      if (allWeakAreas.some(area => area.toLowerCase().includes(moduleCategory.toLowerCase()))) {
+      if (
+        allWeakAreas.some((area) =>
+          area.toLowerCase().includes(moduleCategory.toLowerCase())
+        )
+      ) {
         score += 30;
-        reason.push('Addresses your weak areas');
+        reason.push("Addresses your weak areas");
       }
 
       // 4. Low performance in category
-      if (categoryPerformance[moduleCategory] && categoryPerformance[moduleCategory].average < 70) {
+      if (
+        categoryPerformance[moduleCategory] &&
+        categoryPerformance[moduleCategory].average < 70
+      ) {
         score += 25;
-        reason.push('Improve performance in this area');
+        reason.push("Improve performance in this area");
       }
 
-      // 5. Sequential order preference
+      // 5. Sequential order
       const moduleOrder = module.order;
       const completedOrders = userProgress
-        .filter(p => p.status === 'completed' && p.module)
-        .map(p => p.module.order);
-      
-      if (completedOrders.length > 0) {
+        .filter(
+          (p) =>
+            p.status === "completed" &&
+            p.module &&
+            typeof p.module.order === "number"
+        )
+        .map((p) => p.module.order);
+
+      if (completedOrders.length > 0 && typeof moduleOrder === "number") {
         const maxCompletedOrder = Math.max(...completedOrders);
         if (moduleOrder === maxCompletedOrder + 1) {
           score += 15;
-          reason.push('Next in sequence');
+          reason.push("Next in sequence");
         }
       }
 
       // 6. Time since last activity in category
-      const categoryProgress = userProgress.filter(p => 
-        p.module && p.module.category === moduleCategory
+      const categoryProgress = userProgress.filter(
+        (p) => p.module && p.module.category === moduleCategory
       );
-      
+
       if (categoryProgress.length > 0) {
-        const lastAccessed = Math.max(...categoryProgress.map(p => 
-          new Date(p.lastAccessed || 0).getTime()
-        ));
-        const daysSinceAccess = (Date.now() - lastAccessed) / (1000 * 60 * 60 * 24);
-        
-        if (daysSinceAccess > 7) {
-          score += 10;
-          reason.push('Review recommended');
+        const lastAccessed = Math.max(
+          ...categoryProgress.map((p) =>
+            new Date(p.lastAccessed || 0).getTime()
+          )
+        );
+        if (lastAccessed > 0) {
+          const daysSinceAccess =
+            (Date.now() - lastAccessed) / (1000 * 60 * 60 * 24);
+          if (daysSinceAccess > 7) {
+            score += 10;
+            reason.push("Review recommended");
+          }
         }
       }
 
@@ -161,50 +174,60 @@ router.get('/recommend', auth, async (req, res) => {
             category: module.category,
             difficulty: module.difficulty,
             estimatedTime: module.estimatedTime,
-            description: module.description
+            description: module.description,
           },
           score,
-          priority: score > 40 ? 'high' : score > 20 ? 'medium' : 'low',
+          priority: score > 40 ? "high" : score > 20 ? "medium" : "low",
           reasons: reason,
-          currentProgress: progress ? {
-            status: progress.status,
-            completionPercentage: progress.completionPercentage,
-            timeSpent: progress.timeSpent
-          } : null
+          currentProgress: progress
+            ? {
+                status: progress.status,
+                completionPercentage: progress.completionPercentage,
+                timeSpent: progress.timeSpent,
+              }
+            : null,
         });
       }
     });
 
-    // Sort by score and limit
     recommendations.sort((a, b) => b.score - a.score);
 
-    // Group recommendations
-    const highPriority = recommendations.filter(r => r.priority === 'high').slice(0, 3);
-    const mediumPriority = recommendations.filter(r => r.priority === 'medium').slice(0, 5);
-    const lowPriority = recommendations.filter(r => r.priority === 'low').slice(0, 3);
+    const highPriority = recommendations
+      .filter((r) => r.priority === "high")
+      .slice(0, 3);
+    const mediumPriority = recommendations
+      .filter((r) => r.priority === "medium")
+      .slice(0, 5);
+    const lowPriority = recommendations
+      .filter((r) => r.priority === "low")
+      .slice(0, 3);
 
-    // Generate study plan
-    const studyPlan = generateStudyPlan(highPriority, mediumPriority, userLevel);
+    const studyPlan = generateStudyPlan(
+      highPriority,
+      mediumPriority,
+      userLevel
+    );
 
     res.json({
       recommendations: {
         highPriority,
         mediumPriority,
-        lowPriority
+        lowPriority,
       },
       studyPlan,
       insights: {
         categoryPerformance,
-        weakAreas: userProgress.reduce((areas, p) => [...areas, ...p.weakAreas], []),
-        completionRate: allModules.length > 0 ? 
-          Math.round((completedModules.length / allModules.length) * 100) : 0,
-        averageScore: req.user.stats.averageScore
-      }
+        weakAreas: allWeakAreas,
+        completionRate:
+          allModules.length > 0
+            ? Math.round((completedModules.length / allModules.length) * 100)
+            : 0,
+        averageScore: req.user?.stats?.averageScore || 0,
+      },
     });
-
   } catch (error) {
-    console.error('Get learning path error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get learning path error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -213,56 +236,66 @@ function generateStudyPlan(highPriority, mediumPriority, userLevel) {
   const plan = {
     thisWeek: [],
     nextWeek: [],
-    thisMonth: []
+    thisMonth: [],
   };
 
   let totalTime = 0;
-  const maxWeeklyTime = userLevel === 'beginner' ? 180 : userLevel === 'intermediate' ? 240 : 300; // minutes
+  const maxWeeklyTime =
+    userLevel === "beginner" ? 180 : userLevel === "intermediate" ? 240 : 300; // minutes
 
   // This week - focus on high priority
   highPriority.forEach((rec, index) => {
-    if (totalTime + rec.module.estimatedTime <= maxWeeklyTime && index < 2) {
+    const estimated = rec.module.estimatedTime || 60;
+    if (totalTime + estimated <= maxWeeklyTime && index < 2) {
       plan.thisWeek.push({
         ...rec,
-        suggestedTime: rec.module.estimatedTime,
-        day: index === 0 ? 'Monday-Tuesday' : 'Wednesday-Thursday'
+        suggestedTime: estimated,
+        day: index === 0 ? "Monday-Tuesday" : "Wednesday-Thursday",
       });
-      totalTime += rec.module.estimatedTime;
+      totalTime += estimated;
     }
   });
 
-  // Next week - remaining high priority + medium priority
+  // Next week
   totalTime = 0;
   const remainingHigh = highPriority.slice(plan.thisWeek.length);
   const nextWeekCandidates = [...remainingHigh, ...mediumPriority.slice(0, 3)];
 
   nextWeekCandidates.forEach((rec, index) => {
-    if (totalTime + rec.module.estimatedTime <= maxWeeklyTime && index < 3) {
+    const estimated = rec.module.estimatedTime || 60;
+    if (totalTime + estimated <= maxWeeklyTime && index < 3) {
       plan.nextWeek.push({
         ...rec,
-        suggestedTime: rec.module.estimatedTime,
-        day: ['Monday-Tuesday', 'Wednesday-Thursday', 'Friday-Weekend'][index]
+        suggestedTime: estimated,
+        day: ["Monday-Tuesday", "Wednesday-Thursday", "Friday-Weekend"][index],
       });
-      totalTime += rec.module.estimatedTime;
+      totalTime += estimated;
     }
   });
 
-  // This month - broader view
+  // This month
   const allRecommendations = [...highPriority, ...mediumPriority];
-  const monthlyGoal = Math.min(allRecommendations.length, userLevel === 'beginner' ? 4 : 6);
-  
-  plan.thisMonth = allRecommendations.slice(0, monthlyGoal).map(rec => ({
-    ...rec,
-    suggestedWeek: Math.ceil((plan.thisMonth.length + 1) / 2)
-  }));
+  const monthlyGoal = Math.min(
+    allRecommendations.length,
+    userLevel === "beginner" ? 4 : 6
+  );
+
+  plan.thisMonth = allRecommendations
+    .slice(0, monthlyGoal)
+    .map((rec, index) => ({
+      ...rec,
+      suggestedWeek: Math.ceil((index + 1) / 2),
+    }));
 
   return plan;
 }
 
 // Update user learning preferences
-router.put('/preferences', auth, async (req, res) => {
+router.put("/preferences", auth, async (req, res) => {
   try {
     const { difficulty, learningStyle, voiceEnabled } = req.body;
+
+    req.user.preferences = req.user.preferences || {};
 
     if (difficulty) {
       req.user.preferences.difficulty = difficulty;
@@ -270,19 +303,19 @@ router.put('/preferences', auth, async (req, res) => {
     if (learningStyle) {
       req.user.preferences.learningStyle = learningStyle;
     }
-    if (typeof voiceEnabled === 'boolean') {
+    if (typeof voiceEnabled === "boolean") {
       req.user.preferences.voiceEnabled = voiceEnabled;
     }
 
     await req.user.save();
 
     res.json({
-      message: 'Preferences updated successfully',
-      preferences: req.user.preferences
+      message: "Preferences updated successfully",
+      preferences: req.user.preferences,
     });
   } catch (error) {
-    console.error('Update preferences error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Update preferences error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

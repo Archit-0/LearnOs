@@ -1,51 +1,37 @@
-const express = require('express');
-const axios = require('axios');
-const ChatHistory = require('../models/ChatHistory');
-const auth = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid');
+const express = require("express");
+const axios = require("axios");
+const ChatHistory = require("../models/ChatHistory");
+const auth = require("../middleware/auth");
+const { v4: uuidv4 } = require("uuid");
 
 const router = express.Router();
 
-// OpenAI API configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
-// System prompt for OS tutor
-const SYSTEM_PROMPT = `You are an expert Operating Systems tutor designed to help students learn OS concepts. Your goals are:
+const SYSTEM_PROMPT = `... your system prompt ...`;
 
-1. Explain concepts clearly and in student-friendly language
-2. Use analogies and real-world examples
-3. Break down complex topics into digestible parts
-4. Encourage critical thinking with guided questions
-5. Adapt explanations based on student's level (beginner/intermediate/advanced)
-6. Focus on practical understanding, not just theory
-7. Help debug and explain code related to OS concepts
-
-Topics you cover:
-- Process Management & Scheduling
-- CPU Scheduling Algorithms (FCFS, SJF, Round Robin, etc.)
-- Deadlock Detection & Prevention
-- Synchronization (Semaphores, Mutexes, etc.)
-- Memory Management (Paging, Segmentation, Virtual Memory)
-- File Systems & I/O Management
-
-Always be encouraging and patient. If a student seems confused, try a different approach or analogy.`;
-
-// Chat with AI tutor
-router.post('/chat', auth, async (req, res) => {
+// ---------------------
+// CHAT ROUTE
+// ---------------------
+router.post("/chat", auth, async (req, res) => {
   try {
     const { message, sessionId, context } = req.body;
 
     if (!message || message.trim().length === 0) {
-      return res.status(400).json({ message: 'Message is required' });
+      return res.status(400).json({ message: "Message is required" });
     }
 
     const currentSessionId = sessionId || uuidv4();
 
-    // Get or create chat history
+    // Safe user preference
+    const userLevel =
+      context?.userLevel || req?.user?.preferences?.difficulty || "beginner";
+
+    // Load or create chat history
     let chatHistory = await ChatHistory.findOne({
       user: req.user._id,
-      sessionId: currentSessionId
+      sessionId: currentSessionId,
     });
 
     if (!chatHistory) {
@@ -53,153 +39,157 @@ router.post('/chat', auth, async (req, res) => {
         user: req.user._id,
         sessionId: currentSessionId,
         messages: [],
-        context: context || {}
+        context: context || {},
       });
     }
 
-    // Add user message to history
+    // Add user message
     chatHistory.messages.push({
-      role: 'user',
+      role: "user",
       content: message,
-      context: context || {}
+      context: context || {},
     });
 
-    // Prepare conversation for OpenAI
+    // Limit chat history
+    chatHistory.messages = chatHistory.messages.slice(-20);
+
     const conversation = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...chatHistory.messages.slice(-10).map(msg => ({ // Keep last 10 messages for context
+      { role: "system", content: SYSTEM_PROMPT },
+      ...chatHistory.messages.map((msg) => ({
         role: msg.role,
-        content: msg.content
-      }))
+        content: msg.content,
+      })),
     ];
 
-    // Add context information if available
-    if (context?.currentModule || context?.topics) {
-      const contextPrompt = `Current context: ${context.currentModule ? `Module: ${context.currentModule}` : ''} ${context.topics ? `Topics: ${context.topics.join(', ')}` : ''} User Level: ${context.userLevel || req.user.preferences.difficulty}`;
-      conversation.splice(1, 0, { role: 'system', content: contextPrompt });
+    // Add advanced context
+    if (context) {
+      const topics = Array.isArray(context.topics)
+        ? context.topics.join(", ")
+        : "";
+
+      conversation.unshift({
+        role: "system",
+        content: `User level: ${userLevel}. Module: ${
+          context.currentModule || "N/A"
+        }. Topics: ${topics}.`,
+      });
     }
 
+    // No API key → fallback
     if (!OPENAI_API_KEY) {
-      // Fallback response when OpenAI key is not configured
-      const fallbackResponse = generateFallbackResponse(message);
-      
+      const fallback = generateFallbackResponse(message);
+
       chatHistory.messages.push({
-        role: 'assistant',
-        content: fallbackResponse,
-        context: context || {}
+        role: "assistant",
+        content: fallback,
       });
 
       await chatHistory.save();
 
       return res.json({
-        response: fallbackResponse,
-        sessionId: currentSessionId
+        response: fallback,
+        sessionId: currentSessionId,
       });
     }
 
-    // Call OpenAI API
-    const response = await axios.post(OPENAI_API_URL, {
-      model: 'gpt-3.5-turbo',
-      messages: conversation,
-      max_tokens: 500,
-      temperature: 0.7,
-      presence_penalty: 0.1,
-      frequency_penalty: 0.1
-    }, {
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
+    // Call OpenAI
+    const response = await axios.post(
+      OPENAI_API_URL,
+      {
+        model: "gpt-3.5-turbo",
+        messages: conversation,
+        max_tokens: 500,
+        temperature: 0.7,
       },
-      timeout: 30000
-    });
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     const aiResponse = response.data.choices[0].message.content;
 
-    // Add AI response to history
     chatHistory.messages.push({
-      role: 'assistant',
+      role: "assistant",
       content: aiResponse,
-      context: context || {}
     });
 
     await chatHistory.save();
 
     res.json({
       response: aiResponse,
-      sessionId: currentSessionId
+      sessionId: currentSessionId,
     });
-
   } catch (error) {
-    console.error('Chatbot error:', error);
-    
-    // Provide fallback response on error
-    const fallbackResponse = generateFallbackResponse(req.body.message);
-    res.json({
-      response: fallbackResponse,
+    console.error("Chatbot error:", error);
+
+    const fallback = generateFallbackResponse(req.body?.message || "");
+
+    return res.status(500).json({
+      response: fallback,
       sessionId: req.body.sessionId || uuidv4(),
-      error: 'AI service temporarily unavailable'
+      error: "AI service temporarily unavailable",
     });
   }
 });
 
-// Get chat history
-router.get('/history/:sessionId', auth, async (req, res) => {
+// ---------------------
+// GET HISTORY
+// ---------------------
+router.get("/history/:sessionId", auth, async (req, res) => {
   try {
     const chatHistory = await ChatHistory.findOne({
       user: req.user._id,
-      sessionId: req.params.sessionId
+      sessionId: req.params.sessionId,
     });
-
-    if (!chatHistory) {
-      return res.json({ messages: [] });
-    }
 
     res.json({
-      messages: chatHistory.messages,
-      context: chatHistory.context
+      messages: chatHistory?.messages || [],
+      context: chatHistory?.context || {},
     });
-  } catch (error) {
-    console.error('Get chat history error:', error);
-    res.status(500).json({ message: 'Server error' });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Clear chat history
-router.delete('/history/:sessionId', auth, async (req, res) => {
+// ---------------------
+// DELETE HISTORY
+// ---------------------
+router.delete("/history/:sessionId", auth, async (req, res) => {
   try {
     await ChatHistory.deleteOne({
       user: req.user._id,
-      sessionId: req.params.sessionId
+      sessionId: req.params.sessionId,
     });
 
-    res.json({ message: 'Chat history cleared' });
-  } catch (error) {
-    console.error('Clear chat history error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.json({ message: "Chat history cleared" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Fallback response generator
+// ---------------------
+// FALLBACK GENERATOR
+// ---------------------
+
 function generateFallbackResponse(message) {
-  const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes('process') && lowerMessage.includes('scheduling')) {
-    return "Process scheduling is about determining which process runs next on the CPU. Common algorithms include FCFS (First Come First Served), SJF (Shortest Job First), and Round Robin. Would you like me to explain any specific scheduling algorithm?";
-  }
-  
-  if (lowerMessage.includes('deadlock')) {
-    return "Deadlock occurs when processes are blocked forever, waiting for each other. The four conditions for deadlock are: Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait. We can prevent deadlock by breaking any of these conditions. Which aspect would you like to explore?";
-  }
-  
-  if (lowerMessage.includes('memory') || lowerMessage.includes('paging')) {
-    return "Memory management is crucial in OS. Paging divides memory into fixed-size blocks called pages, while segmentation divides it into variable-size segments. Virtual memory allows processes to use more memory than physically available. What specific memory concept interests you?";
-  }
-  
-  if (lowerMessage.includes('semaphore') || lowerMessage.includes('synchronization')) {
-    return "Synchronization ensures processes access shared resources safely. Semaphores are counters that control access - binary semaphores work like locks, while counting semaphores allow multiple accesses. Mutexes provide mutual exclusion. Need help with a specific synchronization problem?";
-  }
-  
-  return "I'm here to help you learn Operating Systems! I can explain concepts like process scheduling, memory management, deadlocks, synchronization, file systems, and more. What specific topic would you like to explore?";
+  const msg = message.toLowerCase();
+
+  if (msg.includes("process") && msg.includes("scheduling"))
+    return "Process scheduling decides which process uses the CPU next...";
+
+  if (msg.includes("deadlock"))
+    return "Deadlock occurs when processes are blocked forever...";
+
+  if (msg.includes("memory") || msg.includes("paging"))
+    return "Memory management includes paging, segmentation...";
+
+  if (msg.includes("semaphore"))
+    return "Semaphores help in process synchronization...";
+
+  return "I'm here to help you learn Operating Systems! What topic would you like to explore?";
 }
 
 module.exports = router;

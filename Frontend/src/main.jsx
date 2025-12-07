@@ -45,7 +45,7 @@ const route = createBrowserRouter([
         path: "/simulation/",
         children: [
           {
-            path: "Introduction-to-os",
+            path: "introduction-to-operating-systems",
             element: <Index />,
           },
           {

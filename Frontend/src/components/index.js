@@ -2,13 +2,6 @@ import Button from "./Button";
 import Input from "./Input";
 import LoginComponent from "./LoginComponent";
 import Signup from "./Signup";
-import DashboardCom from './DashboardCom'
+import DashboardCom from "./DashBoard/DashboardCom";
 import Header from "./Header/Header";
-export {
-  Button,
-  Input,
-  LoginComponent,
-  Signup,
-  DashboardCom,
-  Header
-}
+export { Button, Input, LoginComponent, Signup, DashboardCom, Header };

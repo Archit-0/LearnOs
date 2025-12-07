@@ -29,7 +29,7 @@ app.use(
 );
 
 const allowedOrigins = [
-  "http://localhost:3000",
+  "http://localhost:5173",
   "https://learnos-1.onrender.com",
 ];
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginSuccess as authLogin } from "../store/authSlice";
+import { loginSuccess } from "../store/authSlice";
 import { Button, Input } from "./index";
 import { useDispatch } from "react-redux";
 import apiService from "../Api/api";
@@ -25,21 +25,24 @@ function LoginComponent() {
     setLoading(true);
 
     try {
-      // 🔥 Backend should return { token, user }
       const session = await apiService.login(data);
+      // expected: { token, user }
 
-      if (session?.user && session?.token) {
-        // Save to localStorage for instant load
-        localStorage.setItem("token", session.token);
-        localStorage.setItem("user", JSON.stringify(session.user));
-
-        dispatch(authLogin(session.user));
-        navigate("/");
-      } else {
-        setError("Invalid response from server");
+      if (!session?.token || !session?.user) {
+        setError("Invalid server response");
+        return;
       }
+
+      // Save to localStorage
+      localStorage.setItem("token", session.token);
+      localStorage.setItem("user", JSON.stringify(session.user));
+
+      // FIXED: Correct dispatch payload
+      dispatch(loginSuccess(session));
+
+      navigate("/");
     } catch (error) {
-      setError(error.message);
+      setError(error?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ function LoginComponent() {
         </h2>
 
         <p className="mt-2 text-center text-base text-black/60">
-          Don&apos;t have an account?&nbsp;
+          Don&apos;t have an account?{" "}
           <Link
             to="/register"
             className="font-medium text-primary hover:underline"
@@ -68,7 +71,7 @@ function LoginComponent() {
           </Link>
         </p>
 
-        {error && <p className="text-red-600 mt-8 text-center">{error}</p>}
+        {error && <p className="text-red-600 mt-6 text-center">{error}</p>}
 
         <form onSubmit={handleSubmit(login)} className="mt-8">
           <div className="space-y-5">
@@ -77,11 +80,11 @@ function LoginComponent() {
               placeholder="Enter your email"
               type="email"
               {...register("email", {
-                required: true,
+                required: "Email is required",
                 validate: {
-                  matchPatern: (value) =>
-                    /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(value) ||
-                    "Email address must be valid",
+                  matchPatern: (v) =>
+                    /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v) ||
+                    "Invalid email format",
                 },
               })}
             />
@@ -91,7 +94,7 @@ function LoginComponent() {
               type="password"
               placeholder="Enter your password"
               {...register("password", {
-                required: true,
+                required: "Password is required",
               })}
             />
 
