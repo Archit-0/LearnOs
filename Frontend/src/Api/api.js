@@ -1,8 +1,8 @@
 // api.js - Frontend API Service Client using Axios
-import axios from 'axios';
+import axios from "axios";
 
-// const API_BASE_URL = 'https://learnos-olvx.onrender.com/api';
-const API_BASE_URL = 'http://localhost:5000/api'; 
+const API_BASE_URL = "https://learnos-olvx.onrender.com/api";
+// const API_BASE_URL = 'http://localhost:5000/api';
 // const API_BASE_URL = "mongodb+srv://baniya8368:baniya0422@cluster0.ahafqbb.mongodb.net/osLearningPlatform?appName=Cluster0"
 class ApiService {
   constructor() {
@@ -11,14 +11,14 @@ class ApiService {
       baseURL: API_BASE_URL,
       timeout: 1000000, // 10 second timeout
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
     // Setup request interceptor to add auth token
     this.client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem("authToken");
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -41,10 +41,11 @@ class ApiService {
           // Optionally redirect to login
           // window.location.href = '/login';
         }
-        
-        const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
-        console.error('API Error:', errorMessage);
-        
+
+        const errorMessage =
+          error.response?.data?.message || error.message || "An error occurred";
+        console.error("API Error:", errorMessage);
+
         return Promise.reject(new Error(errorMessage));
       }
     );
@@ -52,12 +53,12 @@ class ApiService {
 
   // Set authentication token
   setToken(token) {
-    localStorage.setItem('authToken', token);
+    localStorage.setItem("authToken", token);
   }
 
   // Clear authentication token
   clearToken() {
-    localStorage.removeItem('authToken');
+    localStorage.removeItem("authToken");
   }
 
   // ===============================
@@ -65,27 +66,27 @@ class ApiService {
   // ===============================
 
   async register(userData) {
-    const response = await this.client.post('/auth/register', userData);
-    
+    const response = await this.client.post("/auth/register", userData);
+
     if (response.token) {
       this.setToken(response.token);
     }
-    
+
     return response;
   }
 
   async login(credentials) {
-    const response = await this.client.post('/auth/login', credentials);
-    
+    const response = await this.client.post("/auth/login", credentials);
+
     if (response.token) {
       this.setToken(response.token);
     }
-    
+
     return response;
   }
 
   async getMe() {
-    return await this.client.get('/auth/me');
+    return await this.client.get("/auth/me");
   }
 
   async logout() {
@@ -99,7 +100,7 @@ class ApiService {
   // ===============================
 
   async getModules() {
-    return await this.client.get('/modules');
+    return await this.client.get("/modules");
   }
 
   async getModule(slug) {
@@ -123,11 +124,17 @@ class ApiService {
   }
 
   async submitQuizAnswer(attemptId, answerData) {
-    return await this.client.put(`/quizzes/attempt/${attemptId}/answer`, answerData);
+    return await this.client.put(
+      `/quizzes/attempt/${attemptId}/answer`,
+      answerData
+    );
   }
 
   async submitQuizAttempt(attemptId, submissionData = {}) {
-    return await this.client.put(`/quizzes/attempt/${attemptId}/submit`, submissionData);
+    return await this.client.put(
+      `/quizzes/attempt/${attemptId}/submit`,
+      submissionData
+    );
   }
 
   // ===============================
@@ -135,7 +142,7 @@ class ApiService {
   // ===============================
 
   async sendChatMessage(message, sessionId = null) {
-    return await this.client.post('/chatbot/chat', {
+    return await this.client.post("/chatbot/chat", {
       message,
       sessionId,
     });
@@ -153,15 +160,21 @@ class ApiService {
   // ===============================
 
   async runCpuSchedulingSimulation(simulationData) {
-    return await this.client.post('/simulators/cpu-scheduling', simulationData);
+    return await this.client.post("/simulators/cpu-scheduling", simulationData);
   }
 
   async runMemoryAllocationSimulation(simulationData) {
-    return await this.client.post('/simulators/memory-allocation', simulationData);
+    return await this.client.post(
+      "/simulators/memory-allocation",
+      simulationData
+    );
   }
 
   async runPageReplacementSimulation(simulationData) {
-    return await this.client.post('/simulators/page-replacement', simulationData);
+    return await this.client.post(
+      "/simulators/page-replacement",
+      simulationData
+    );
   }
 
   // ===============================
@@ -169,14 +182,14 @@ class ApiService {
   // ===============================
 
   async getProgressDashboard() {
-    return await this.client.get('/progress/dashboard');
+    return await this.client.get("/progress/dashboard");
   }
 
   async getLearningPathRecommendations() {
-    return await this.client.get('/learning-path/recommend');
+    return await this.client.get("/learning-path/recommend");
   }
-  async updatePreferences(preference){
-    return await this.client.put('/learning-path/preferences',preference);
+  async updatePreferences(preference) {
+    return await this.client.put("/learning-path/preferences", preference);
   }
 }
 
