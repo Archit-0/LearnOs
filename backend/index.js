@@ -22,18 +22,27 @@ const app = express();
 // Security middleware
 app.use(
   helmet({
+    crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
   })
 );
 
-const allowedOrigins = ["http://localhost:3000", process.env.FRONTEND_URL];
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://learnos-1.onrender.com",
+];
 
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   })
 );
+
+// Allow preflight
+app.options("*", cors());
 
 // Compression (performance boost)
 app.use(compression());
