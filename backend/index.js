@@ -31,6 +31,7 @@ app.use(
 const allowedOrigins = [
   "http://localhost:5173",
   "https://learnos-1.onrender.com",
+  "https://learn-os-gules.vercel.app",
 ];
 
 app.use(
